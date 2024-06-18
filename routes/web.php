@@ -1,62 +1,69 @@
 <?php
-
+use App\Http\Middleware\Admin;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\LoginController;
+use App\Http\Controllers\Admin\AdminsController;
+use App\Http\Controllers\Admin\ContactsController;
+use App\Http\Controllers\Admin\ArticlesController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
+use App\Http\Controllers\Front\IndexController;
+use App\Http\Controllers\Front\UserController;
+use App\Http\Controllers\Admin\CommentsController;
 
 
 
-Auth::routes();
 
-Route::get('/', [App\Http\Controllers\Pages\PageController::class, 'index']);
-Route::get('/contact', [App\Http\Controllers\Pages\PageController::class, 'contact']);
-Route::get('/aboutUs', [App\Http\Controllers\Pages\PageController::class, 'aboutUs']);
-Route::get('/prices', [App\Http\Controllers\Pages\PageController::class, 'prices']);
-Route::get('blog/{id}/{slug?}', [App\Http\Controllers\Pages\PageController::class, 'blog_show'])->name('blog.show');
+// ენებთან სამუშად
+// მომხმარებლის მხარე 
+Route::group(['prefix' => LaravelLocalization::setLocale(),'middleware' => [ 'localeSessionRedirect', 'localizationRedirect', 'localeViewPath' ]], function(){  
+   
+    // მთავარი გვერდი
+    Route::get('/', [IndexController::class, 'index'])->name('index');
 
-// Admin
-
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
-
-// blogs
-Route::get('Admin/blogs', [App\Http\Controllers\Admin\BlogController::class, 'index']);
-Route::get('Admin/blogs/create', [App\Http\Controllers\Admin\BlogController::class, 'create']);
-Route::get('Admin/blogs/edit/{id}', [App\Http\Controllers\Admin\BlogController::class, 'edit'])->name('blog.edit');
-Route::POST('Admin/blogs/store', [App\Http\Controllers\Admin\BlogController::class, 'store']);
-Route::POST('Admin/blogs/update/{id}', [App\Http\Controllers\Admin\BlogController::class, 'update'])->name('blog.update');
-Route::POST('Admin/blogs/delete/{id}', [App\Http\Controllers\Admin\BlogController::class, 'destroy'])->name('blog.delete');
-
-// AboutUs
-Route::get('Admin/aboutUs', [App\Http\Controllers\Admin\AboutUsController::class, 'index']);
-Route::POST('Admin/aboutUs/update/', [App\Http\Controllers\Admin\AboutUsController::class,
- 'update']);
-
- //category
-Route::get('Admin/category', [App\Http\Controllers\Admin\CategoryController::class, 'index']);
-Route::POST('Admin/category/create/', [App\Http\Controllers\Admin\CategoryController::class,
- 'store']);
+    //სიახლის შიდა გვერდი
+    Route::get('/article/{id}', [IndexController::class, 'article'])->name('article');
 
 
-//social
-Route::get('Admin/social', [App\Http\Controllers\SocialController::class, 'index']);
-Route::POST('Admin/social/create/', [App\Http\Controllers\SocialController::class,
- 'store']);
+    Route::middleware(['auth'])->group(function () {
+
+        Route::get('/dashboard', [UserController::class, 'dashboard'])->name('dashboard');
+        Route::post('/update_data', [UserController::class, 'update_data'])->name('update_data');
+        Route::post('/update_password', [UserController::class, 'update_password'])->name('update_password');
+        Route::post('/comment/{id}', [UserController::class, 'comment'])->name('comment');
+    }); 
+ 
+});
+
+// ავტორიზაცია და სისტემიდან გასვლა
+Route::group(['middleware' => ['admin'], 'prefix' => 'admin'], function () {
+    
+    // ავტორიზაცია და სისტემიდან გასვლა
+    Route::get('/login', [LoginController::class, 'showLogin'])->withoutMiddleware([Admin::class])->name('ShowLogin');
+    Route::post('/signin', [LoginController::class, 'login'])->withoutMiddleware([Admin::class])->name('AdminLogin');
+    Route::get('/logout', [LoginController::class, 'logout'])->name('AdminLogout');
+    
+    // ადმინისტრატორის პანელის მთავარი გვერდი 
+    Route::get('/', function () {
+        return view('admin.index');
+    })->name('AdminMainPage');
+    
+    // ადმინისტრატორები
+    Route::resource('admins', AdminsController::class);
+    
+    // საკონტაქტო ინფორმაციის გვერდი
+    Route::resource('contacts', ContactsController::class, ['only' => ['edit','update']]);
+    Route::get('/contacts/cache', [ContactsController::class, 'cache'])->name('contacts.cache');
+    
+    // სიახლეები
+    Route::resource('articles', ArticlesController::class);
+
+    // კომენტარების გვერდი
+    Route::resource('comments', CommentsController::class, ['only' => ['index','destroy']]);
+    Route::get('/admin/comments', [CommentsController::class, 'index'])->name('comments.index');
+Route::post('/admin/comments/confirm/{id}', [CommentsController::class, 'confirm'])->name('comments.confirm');
+});       
 
 
-//slug
-Route::get('Admin/slug', [App\Http\Controllers\Admin\SlugController::class, 'index']);
-Route::POST('Admin/slug/create/', [App\Http\Controllers\Admin\SlugController::class,
- 'store']);
+require __DIR__.'/auth.php';
 
-//search
-Route::get('search', [App\Http\Controllers\SearchController::class, 'index']);
 
